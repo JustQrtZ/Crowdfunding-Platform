@@ -39,6 +39,7 @@ namespace CourseProject.Api.Controllers
             var passwordValid = _tokenService.VerifyPassword(loginModel.Password, user.Password);
             if (!passwordValid) return BadRequest(new {error = "invalid password"});
             if (!user.IsActive) return BadRequest(new {error = "User is blocked and can't login"});
+
             var claims = new List<Claim>
             {
                 new(ClaimTypes.Name, user.Id),
@@ -81,11 +82,14 @@ namespace CourseProject.Api.Controllers
                     user.Username,
                     role = user.Role.Name,
                     user.Language,
-                    user.DesignTheme
+                    user.DesignTheme,
+                    refreshToken = user.RefreshToken,
+                    accessToken = Request.Headers["Authorization"].ToString()
+                        .Replace("Bearer ", "")
                 }
             );
         }
-        
+
         [HttpPost("register")]
         public ActionResult Post([FromBody] RegisterViewModel registerModel)
         {
@@ -110,7 +114,7 @@ namespace CourseProject.Api.Controllers
                 LastLoginDate = DateTime.Now,
                 Role = _rolesRepository.GetSingle(x => x.Name == "User")
             };
-            
+
             _userRepository.Add(user);
             _userRepository.Commit();
 
@@ -121,7 +125,6 @@ namespace CourseProject.Api.Controllers
             };
 
             var accessToken = _tokenService.GenerateAccessToken(claims);
-            var refreshToken = _tokenService.GenerateRefreshToken();
 
             return Ok(new
             {
@@ -130,7 +133,7 @@ namespace CourseProject.Api.Controllers
                 role = user.Role.Name,
                 user.Language,
                 accessToken,
-                refreshToken,
+                refreshToken = user.RefreshToken,
                 user.DesignTheme
             });
         }

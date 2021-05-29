@@ -20,21 +20,18 @@ namespace CourseProject.Api.Controllers
             _tokenService = tokenService ?? throw new ArgumentNullException(nameof(tokenService));
         }
 
-        [HttpPost("refresh")] 
-        public ActionResult Refresh([FromBody]TokenApiViewModel tokenApiModel)
+        [HttpPost("refresh")]
+        public ActionResult Refresh([FromBody] TokenApiViewModel tokenApiModel)
         {
             try
             {
-                if(!ModelState.IsValid) return BadRequest("Model state is invalid"); 
+                if (!ModelState.IsValid) return BadRequest("Model state is invalid");
                 var accessToken = tokenApiModel.AccessToken;
                 var refreshToken = tokenApiModel.RefreshToken;
-                Console.WriteLine(tokenApiModel.AccessToken);
                 var principal = _tokenService.GetPrincipalFromExpiredToken(accessToken);
-                var userId = principal.Identity?.Name; //this is mapped to the Name claim by default
-
-                var user = _userContext.GetSingle(u =>
-                    refreshToken != null && u.RefreshToken == refreshToken && u.Id == userId);
-
+                var userId =
+                    _tokenService.GetUserIdFromClaimsPrincipal(principal); //this is mapped to the Name claim by default
+                var user = _userContext.GetSingle(u => u.RefreshToken == refreshToken && u.Id == userId);
                 if (user == null || user.RefreshToken != refreshToken || user.RefreshTokenExpiryTime <= DateTime.Now ||
                     !user.IsActive) return BadRequest("Invalid client request");
 
@@ -56,7 +53,7 @@ namespace CourseProject.Api.Controllers
                 throw;
             }
         }
-        
+
         [Authorize]
         [HttpPost("revoke")]
         public IActionResult Revoke()

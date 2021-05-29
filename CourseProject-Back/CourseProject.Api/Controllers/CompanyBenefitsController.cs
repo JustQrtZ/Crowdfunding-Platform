@@ -37,9 +37,9 @@ namespace CourseProject.Api.Controllers
                 _tokenService.GetPrincipalFromExpiredToken(Request.Headers[HeaderNames.Authorization].ToString()
                     .Remove(0, 7));
             var userId = _tokenService.GetUserIdFromClaimsPrincipal(principal);
-            return _crowdfundingCompany.CheckIfHasAccess(userId,companyId);
+            return _crowdfundingCompany.CheckIfHasAccess(userId, companyId);
         }
-        
+
         [AllowAnonymous]
         [HttpGet("getBenefits")]
         public ActionResult GetBenefitsForCompany(string id)
@@ -74,19 +74,20 @@ namespace CourseProject.Api.Controllers
         }
 
         [HttpPatch("editCompanyBenefit")]
-        public ActionResult<CompanyBenefit> EditCompanyBenefit([FromBody] EditCompanyBenefitViewModel viewModel)
+        public IActionResult EditCompanyBenefit([FromBody] EditCompanyBenefitViewModel viewModel)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
             if (ChekAccess(viewModel.CrowdfundingCompany))
             {
-                var company = _crowdfundingCompany.GetSingle(x => x.Id == viewModel.CrowdfundingCompany);
-                if (company == null) return BadRequest(new {company = "Company does not exist"});
-                var benefit = _companyBenefit.GetSingle(x => x.Id == viewModel.Id);
+                var benefit = _companyBenefit.GetSingle(
+                    x => x.Id == viewModel.Id && x.CrowdfundingCompany.Id == viewModel.CrowdfundingCompany,
+                    x => x.CrowdfundingCompany);
+                if (benefit == null) return BadRequest(new {company = "Company or benefit does not exist"});
                 benefit.Name = viewModel.Name;
                 benefit.Cost = viewModel.Cost;
                 _companyBenefit.Update(benefit);
                 _companyBenefit.Commit();
-                return benefit;
+                return Ok(_companyBenefit.GetAllBenefitsForCompany(viewModel.CrowdfundingCompany));
             }
             else
             {
@@ -94,8 +95,8 @@ namespace CourseProject.Api.Controllers
             }
         }
 
-        [HttpDelete("deleteCompanyBenefit")]
-        public ActionResult<CompanyBenefit> DeleteCompanyBenefit([FromBody] DeleteCompanyBenefitViewModel viewModel)
+        [HttpPost("deleteCompanyBenefit")]
+        public ActionResult DeleteCompanyBenefit([FromBody] DeleteCompanyBenefitViewModel viewModel)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
             if (ChekAccess(viewModel.CrowdfundingCompany))
@@ -104,7 +105,7 @@ namespace CourseProject.Api.Controllers
                 if (payments.Any())
                 {
                     return BadRequest(new
-                        {company = "U can't delete this benefit because payment has been made for this benefit "});
+                        {error = "U can't delete this benefit because payment has been made for this benefit "});
                 }
 
                 _companyBenefit.DeleteWhere(x =>

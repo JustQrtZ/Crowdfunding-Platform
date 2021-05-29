@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading.Tasks;
 using CourseProject.Api.Comments;
 using CourseProject.Api.Services;
 using CourseProject.Api.Services.Abstraction;
@@ -35,10 +36,11 @@ namespace CourseProject.Api
                 options.AddDefaultPolicy(
                     builder =>
                     {
-                        builder.WithOrigins("http://localhost:3000", "https://courseproject.vercel.app")
-                            .SetIsOriginAllowedToAllowWildcardSubdomains()
+                        builder.WithOrigins("http://localhost:3000", "https://courseproject.vercel.app", "https://webapp-210513212326.azurewebsites.net")
+                            .AllowAnyOrigin()
+                            .AllowAnyHeader()
                             .AllowAnyMethod()
-                            .AllowAnyHeader();
+                            .SetIsOriginAllowed(_ => true);
                     });
             });
 
@@ -67,8 +69,27 @@ namespace CourseProject.Api
                             Encoding.UTF8.GetBytes(Configuration.GetValue<string>("JWTSecretKey"))
                         )
                     };
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnMessageReceived = context =>
+                        {
+                            var accessToken = context.Request.Query["access_token"];
+
+                            // If the request is for our hub...
+                            var path = context.HttpContext.Request.Path;
+                            if (!string.IsNullOrEmpty(accessToken) &&
+                                (path.StartsWithSegments("/comments")))
+                            {
+                                // Read the token out of the query string
+                                context.Token = accessToken;
+                            }
+                            return Task.CompletedTask;
+                        }
+                    };
                 });
 
+            
+            
             services.AddScoped<ICommentsRepository, CommentsRepository>();
             services.AddScoped<ICompanyBenefitRepository, CompanyBenefitRepository>();
             services.AddScoped<ICompanyNewsRepository, CompanyNewsRepository>();
@@ -105,7 +126,8 @@ namespace CourseProject.Api
             app.UseAuthentication();
             app.UseCors();
             app.UseAuthorization();
-
+            app.UseHttpsRedirection();
+            
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapHub<CommentsHub>("/comments");

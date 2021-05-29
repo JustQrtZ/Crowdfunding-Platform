@@ -7,7 +7,7 @@ namespace CourseProject.Model.Entities
         public string Id { get; set; }
         public User User { get; set; }
         public string Content { get; set; }
-        public CompanyNews CompanyNews { get; set; }
+        public CrowdfundingCompany Company { get; set; }
         public DateTime CreationDate { get; set; }
     }
 }

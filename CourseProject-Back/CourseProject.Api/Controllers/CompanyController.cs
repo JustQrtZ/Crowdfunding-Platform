@@ -135,7 +135,6 @@ namespace CourseProject.Api.Controllers
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
-            var companyId = Guid.NewGuid().ToString();
             var principal =
                 _tokenService.GetPrincipalFromExpiredToken(Request.Headers[HeaderNames.Authorization].ToString()
                     .Remove(0, 7));
@@ -146,11 +145,11 @@ namespace CourseProject.Api.Controllers
 
             var crowdfundingCompany = new CrowdfundingCompany
             {
-                Id = companyId,
+                Id = Guid.NewGuid().ToString(),
                 Title = companyViewModel.Title,
                 Description = companyViewModel.Description,
                 RequiredAmount = companyViewModel.RequiredAmount,
-                MainPhotoUrl = companyViewModel.MainPhotoUrl,
+                MainPhotoUrl = GetPhotosUrl(new[] {companyViewModel.MainPhotoUrl}).Result.First(),
                 EndCompanyDate = DateTime.Parse(companyViewModel.EndCompanyDate, CultureInfo.InvariantCulture),
                 User = owner,
                 Theme = companyViewModel.Theme
@@ -158,17 +157,37 @@ namespace CourseProject.Api.Controllers
 
             _crowdfundingCompany.Add(crowdfundingCompany);
             _crowdfundingCompany.Commit();
-            CompanyTags(companyViewModel.Tags, companyId);
-            return Ok();
+            
+            CompanyTags(companyViewModel.Tags, crowdfundingCompany.Id);
+            
+            _videos.Add(new Videos
+            {
+                Id = Guid.NewGuid().ToString(),
+                CrowdfundingCompany = crowdfundingCompany,
+                VideoUrl = companyViewModel.VideoUrl
+            });
+            _videos.Commit();
+            
+            var companyPhotosUrls = GetPhotosUrl(companyViewModel.Photos);
+            foreach (var photo in companyPhotosUrls.Result)
+            {
+                _photos.Add(new Photos
+                {
+                    CrowdfundingCompany = crowdfundingCompany,
+                    Id = Guid.NewGuid().ToString(),
+                    PhotoUrl = photo
+                });
+            }
+
+            _photos.Commit();
+            
+            return Ok(_crowdfundingCompany.GetUserCompanies(owner.Id));
         }
 
         public void CompanyTags(string[] tags, string companyId)
         {
             _companyTags.DeleteWhere(x => x.CrowdfundingCompany.Id == companyId);
             var company = _crowdfundingCompany.GetSingle(x => x.Id == companyId);
-            /*
-            var uniqueTag = _tagsRepository.GetAll();
-            */
             foreach (var tag in tags)
                 if (_tagsRepository.IsTagUniq(tag))
                 {
@@ -246,6 +265,7 @@ namespace CourseProject.Api.Controllers
             var company = _crowdfundingCompany.GetSingle(
                 x => x.Id == companyViewModel.CompanyId);
             if (company == null) return BadRequest(new {company = "company does not exist or userid does not exist"});
+            
             company.Title = companyViewModel.Title;
             company.Description = companyViewModel.Description;
             company.RequiredAmount = companyViewModel.RequiredAmount;
