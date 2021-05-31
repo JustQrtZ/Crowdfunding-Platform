@@ -37,19 +37,20 @@ namespace CourseProject.Api.Controllers
 
         [AllowAnonymous]
         [HttpGet("getAllCompanyNews")]
-        public ActionResult GetAllCompanyNews([FromBody] AllCompanyNewsViewModel viewModel)
+        public ActionResult GetAllCompanyNews(string companyId)
         {
+            Console.WriteLine(companyId);
             var company = _crowdfundingCompany.GetSingle(crowdfundingCompany =>
-                crowdfundingCompany.Id == viewModel.CrowdfundingCompany);
+                crowdfundingCompany.Id == companyId);
             if (company == null) return BadRequest(new {company = "company does not exist"});
-            return Ok(_companyNews.GetAllNewsForCompany(viewModel.CrowdfundingCompany));
+            return Ok(_companyNews.GetAllNewsForCompany(companyId));
         }
 
-        [AllowAnonymous]
         [HttpPost("createNews")]
         public ActionResult CreateNews([FromBody] CreateNewsViewModel createNewsViewModel)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
+            if (!ChekAccess(createNewsViewModel.CrowdfundingCompany)) return Forbid();
             var newsId = Guid.NewGuid().ToString();
             var company = _crowdfundingCompany.GetSingle(x => x.Id == createNewsViewModel.CrowdfundingCompany);
             if (company == null) return BadRequest(new {company = "company does not exist"});
@@ -67,28 +68,22 @@ namespace CourseProject.Api.Controllers
             return Ok(news);
         }
 
-        //TODO Remove user properties from response and leave only UserId  
-        [AllowAnonymous]
         [HttpPatch("editNews")]
         public ActionResult<EditNewsViewModel> EditNews([FromBody] EditNewsViewModel editNewsViewModel)
         {
             if (!ModelState.IsValid) return BadRequest(ModelState);
-            if (ChekAccess(editNewsViewModel.CrowdfundingCompany))
-            {
-                var companyNews = _companyNews.GetSingle(x => x.Id == editNewsViewModel.Id);
-                if (companyNews == null) return BadRequest(new {company = "company does not exist"});
+            if (!ChekAccess(editNewsViewModel.CrowdfundingCompany)) return Forbid();
 
-                companyNews.Title = editNewsViewModel.Title;
-                companyNews.ImageUrl = editNewsViewModel.ImageUrl;
-                companyNews.Content = editNewsViewModel.Content;
-                _companyNews.Update(companyNews);
-                _companyNews.Commit();
-                return Ok(companyNews);
-            }
-            else
-            {
-                return StatusCode(403);
-            }
+
+            var companyNews = _companyNews.GetSingle(x => x.Id == editNewsViewModel.Id);
+            if (companyNews == null) return BadRequest(new {company = "company does not exist"});
+
+            companyNews.Title = editNewsViewModel.Title;
+            companyNews.ImageUrl = editNewsViewModel.ImageUrl;
+            companyNews.Content = editNewsViewModel.Content;
+            _companyNews.Update(companyNews);
+            _companyNews.Commit();
+            return Ok();
         }
 
         [HttpDelete("deleteNews")]
